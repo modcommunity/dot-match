@@ -16,7 +16,7 @@ The match loop for a Godot 4 multiplayer game: warmup, rounds, scoring, teams,
 spawning and respawning. Everything counted in ticks and driven by one call, so a
 server's round clock and its netcode agree about what time it is.
 
-Part of the [dot-*](../NOTES.md) family. Needs **dot-core** and nothing else.
+Part of the [dot-*](https://github.com/modcommunity) family. Needs **dot-core** and nothing else.
 
 ## Install
 
