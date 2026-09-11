@@ -41,7 +41,7 @@ match_node.report_kill(killer_key, victim_key, &"rifle", tick, headshot)
 
 ## The idea
 
-A match is a state machine — `WARMUP → COUNTDOWN → LIVE → INTERMISSION → MATCH_END` — and **one call moves it**. No `Timer`, no `_process`, no wall clock.
+A match is a state machine, `WARMUP → COUNTDOWN → LIVE → INTERMISSION → MATCH_END`, and **one call moves it**. No `Timer`, no `_process`, no wall clock.
 
 A match that ticks itself ticks on whatever schedule the engine gives it, which is not the schedule the simulation runs on. A server whose round timer and whose netcode disagree about what time it is produces a round that ends on a different tick for every client.
 
@@ -63,15 +63,15 @@ What *winning* means lives in a `DotMatchRules` resource. `DotMatch` never asks 
 
 ## Three failure modes it is built around
 
-**A scoreboard that rewards rage-quitting.** Records survive a disconnection and a reconnecting player gets their kills back. They are keyed by a stable player key, never a peer id — a peer id is reassigned the moment someone reconnects, and a scoreboard keyed by one hands the next player to join the previous player's kills.
+**A scoreboard that rewards rage-quitting.** Records survive a disconnection and a reconnecting player gets their kills back. They are keyed by a stable player key, never a peer id. A peer id is reassigned the moment someone reconnects, and a scoreboard keyed by one hands the next player to join the previous player's kills.
 
-**Two machines that disagree.** Every ordering decision has an explicit tie-break: ranked scoreboards fall back to the player key, spawn selection to the node name, team assignment to the lower team id, respawn batches to a sort. Left to dictionary iteration order, a server and a client produce different answers — and for team assignment that means they disagree about friendly fire.
+**Two machines that disagree.** Every ordering decision has an explicit tie-break: ranked scoreboards fall back to the player key, spawn selection to the node name, team assignment to the lower team id, respawn batches to a sort. Left to dictionary iteration order, a server and a client produce different answers, and for team assignment that means they disagree about friendly fire.
 
 **A round that never ends.** `DotRulesElimination` treats *zero* teams standing as the end of the round, not as "keep going". A grenade that kills the last player on both sides happens often enough to matter, and waiting for a side that no longer exists is a server that has to be restarted.
 
 ## Spawning
 
-The default rule is furthest-from-the-nearest-threat among the available points, and threats are **enemies only** — spawning people away from their own team scatters a squad across the map. Points have a cooldown, which is what stops two players spawning inside each other.
+The default rule is furthest-from-the-nearest-threat among the available points, and threats are **enemies only**, because spawning people away from their own team scatters a squad across the map. Points have a cooldown, which is what stops two players spawning inside each other.
 
 When every point is on cooldown or occupied, the selector falls back and spawns someone anyway. **Spawning badly beats not spawning at all**: the alternative is a player who is dead until a point frees up, which on a busy map with a short round is the rest of the match.
 
