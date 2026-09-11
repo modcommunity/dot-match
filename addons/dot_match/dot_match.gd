@@ -204,7 +204,11 @@ func setup() -> DotResult:
 	if spawns == null:
 		spawns = DotSpawnSelector.new()
 
-	refresh_spawns()
+	# Quietly: a host that builds its spawn points IN CODE adds them on the lines after
+	# `setup`, which is the documented pattern for a map with no scene — so warning here
+	# means warning on every boot and every changelevel of every such game, about a
+	# condition that is corrected microseconds later. See refresh_spawns.
+	refresh_spawns(false)
 
 	if register_service:
 		_registered_name = (
@@ -218,7 +222,16 @@ func setup() -> DotResult:
 
 
 ## Re-collects the spawn points. Call after loading a level.
-func refresh_spawns() -> void:
+##
+## [param announce_empty] is the difference between "I was asked to re-collect and found
+## nothing", which is worth a warning, and "I have just been built and the host has not
+## put its points in yet", which is not. [method setup] passes false for the second
+## reason: game-arena, game-g2gfast and every other code-built map in this family add
+## their points with [method add_spawn_point] immediately after setup returns, and a red
+## line on every boot about a condition that is fixed on the next line is the shape this
+## family calls "a warning that reads like a setting nobody has filled in" — which is how
+## dot-server's audit log went unopened in every default configuration for months.
+func refresh_spawns(announce_empty: bool = true) -> void:
 	_spawn_points.clear()
 
 	var root: Node = null
@@ -238,7 +251,10 @@ func refresh_spawns() -> void:
 		# Not an error — a test and a lobby both legitimately have none — but a
 		# deathmatch with no spawn points is a match nobody can play, and the symptom
 		# is players who never appear rather than anything failing.
-		DotLog.warn(CHANNEL, "no spawn points found", {"root": root.name})
+		if announce_empty:
+			DotLog.warn(CHANNEL, "no spawn points found", {"root": root.name})
+		else:
+			DotLog.debug(CHANNEL, "no spawn points yet", {"root": root.name})
 	else:
 		DotLog.debug(CHANNEL, "spawn points", {"count": _spawn_points.size()})
 
