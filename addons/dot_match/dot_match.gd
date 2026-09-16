@@ -637,6 +637,17 @@ func _drain_respawns(current_tick: int) -> void:
 ## Public so a game can spawn someone outside the queue — a round start it drives
 ## itself, a spectator joining play, an admin's respawn command.
 func choose_spawn(key: String, tick: int, tag: StringName = &"") -> DotSpawnPoint:
+	# [b]No points at all is a game that places its own players, and not a fault.[/b] The
+	# selector's "no usable spawn point at all" means it was GIVEN points and could not use
+	# one, which is a mapping mistake worth a warning. An empty list is a different thing
+	# entirely: a game whose every position is computed — a field rebuilt each round, a
+	# vehicle interior, a map made of platforms that tip over — has said so by having none,
+	# and [method refresh_spawns] has already warned once if that was an accident. Asking
+	# anyway produced a warning per player per round, for ever, on a server configured
+	# exactly as its game intended.
+	if _spawn_points.is_empty():
+		return null
+
 	var record := scoreboard.find(key)
 	var team := record.team if record != null else 0
 
