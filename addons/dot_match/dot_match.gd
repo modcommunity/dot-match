@@ -574,6 +574,18 @@ func report_kill(
 		victim.note_death()
 
 	var entry := feed.add_kill(killer, victim, cause, tick, headshot)
+
+	# The one funnel every kill passes through, so the line is here and not in the feed.
+	# DEBUG, as dot-combat logs each hit: a kill is a decision the rules made, and on a
+	# busy server INFO per kill is the log being a scoreboard. It answers "did that count".
+	DotLog.debug(CHANNEL, "kill", {
+		"killer": killer_key,
+		"victim": victim_key,
+		"cause": String(cause),
+		"headshot": headshot,
+		"points": points,
+		"scoring": is_scoring(),
+	})
 	kill_recorded.emit(entry)
 
 	if not rules.respawn_disabled:

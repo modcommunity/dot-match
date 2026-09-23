@@ -8,7 +8,8 @@ extends Node
 ## a leak proportional to how long the server has been up. [member capacity] entries is
 ## more than any HUD shows and enough for a "what just happened" panel.
 
-const CHANNEL := "match.feed"
+# No log channel: a bounded ring of kills that emits entry_added. The kill itself is
+# decided in DotMatch.report_kill, which logs it; a second line here is the same kill.
 
 signal entry_added(entry: Entry)
 
