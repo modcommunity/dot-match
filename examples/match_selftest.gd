@@ -17,9 +17,17 @@ const TICK_RATE := 60
 
 const CHECKS := 118
 
+## Sections entered against sections that ran to their last line, and against this. A
+## runtime error inside a section aborts that function and nothing says so; a section that
+## bailed out early after a failed guard is counted as not finished on purpose. The CHECKS
+## total is the other half — see docs/testing.md.
+const SECTIONS := 17
+
 var _passed := 0
 var _failed := 0
 var _failures := PackedStringArray()
+var _entered := 0
+var _completed := 0
 
 
 func _ready() -> void:
@@ -55,6 +63,13 @@ func _run() -> void:
 	for line in _failures:
 		print("  FAIL  %s" % line)
 
+	print("%d of %d sections ran to their last line" % [_completed, _entered])
+	if _entered != SECTIONS or _completed != _entered:
+		print("ERROR: %d sections entered and %d completed, %d expected. One aborted or was skipped." % [
+			_entered, _completed, SECTIONS
+		])
+		get_tree().quit(1)
+		return
 	# The total the section counter cannot be. A runtime error inside a section aborts
 	# that function, and the counter is satisfied because the section had already
 	# announced itself. See docs/testing.md.
@@ -68,6 +83,16 @@ func _run() -> void:
 
 
 # --- Assertions ------------------------------------------------------------
+
+func _section(title: String) -> void:
+	_entered += 1
+	_group(title)
+
+
+## A section reached its last line. See [constant SECTIONS].
+func _done() -> void:
+	_completed += 1
+
 
 func _check(condition: bool, what: String, detail: String = "") -> bool:
 	if condition:
@@ -133,7 +158,7 @@ func _advance(node: DotMatch, from: int, ticks: int) -> int:
 # --- Teams -----------------------------------------------------------------
 
 func _test_teams() -> void:
-	_group("teams")
+	_section("teams")
 
 	var red := DotTeam.make(1, "Red")
 	_check(red.validate().ok, "a team with a positive id validates")
@@ -150,12 +175,13 @@ func _test_teams() -> void:
 
 	var spectators := DotTeam.spectators()
 	_check(spectators.is_spectator, "spectators are marked as such")
+	_done()
 
 
 # --- Scoreboard ------------------------------------------------------------
 
 func _test_scoreboard() -> void:
-	_group("scoreboard")
+	_section("scoreboard")
 
 	var board := DotScoreboard.new()
 	add_child(board)
@@ -221,10 +247,11 @@ func _test_scoreboard() -> void:
 	remove_child(board)
 	tied.queue_free()
 	remove_child(tied)
+	_done()
 
 
 func _test_scoreboard_reconnect() -> void:
-	_group("scoreboard: reconnecting")
+	_section("scoreboard: reconnecting")
 
 	var board := DotScoreboard.new()
 	add_child(board)
@@ -264,12 +291,13 @@ func _test_scoreboard_reconnect() -> void:
 	remove_child(board)
 	small.queue_free()
 	remove_child(small)
+	_done()
 
 
 # --- Kill feed -------------------------------------------------------------
 
 func _test_kill_feed() -> void:
-	_group("kill feed")
+	_section("kill feed")
 
 	var feed := DotKillFeed.new()
 	feed.capacity = 4
@@ -302,12 +330,13 @@ func _test_kill_feed() -> void:
 
 	feed.queue_free()
 	remove_child(feed)
+	_done()
 
 
 # --- Respawns --------------------------------------------------------------
 
 func _test_respawn_queue() -> void:
-	_group("respawn queue")
+	_section("respawn queue")
 
 	var queue := DotRespawnQueue.new(TICK_RATE)
 
@@ -337,6 +366,7 @@ func _test_respawn_queue() -> void:
 		"a batch comes back in a deterministic order",
 		str(batch)
 	)
+	_done()
 
 
 # --- Spawning --------------------------------------------------------------
@@ -361,7 +391,7 @@ func _free_spawns(points: Array[DotSpawnPoint]) -> void:
 
 
 func _test_spawn_points() -> void:
-	_group("spawn points")
+	_section("spawn points")
 
 	var point := DotSpawnPoint.make(Vector3(1.0, 2.0, 3.0), 1)
 	add_child(point)
@@ -391,10 +421,11 @@ func _test_spawn_points() -> void:
 
 	point.queue_free()
 	remove_child(point)
+	_done()
 
 
 func _test_spawn_selection() -> void:
-	_group("spawn selection")
+	_section("spawn selection")
 
 	var points := _make_spawns(5)
 	var selector := DotSpawnSelector.new()
@@ -454,12 +485,13 @@ func _test_spawn_selection() -> void:
 
 	_free_spawns(points)
 	_free_spawns(tie_points)
+	_done()
 
 
 # --- Rules -----------------------------------------------------------------
 
 func _test_rules() -> void:
-	_group("rules")
+	_section("rules")
 
 	var rules := DotMatchRules.deathmatch(10)
 	_check(rules.validate().ok, "a deathmatch ruleset validates")
@@ -511,12 +543,13 @@ func _test_rules() -> void:
 
 	board.queue_free()
 	remove_child(board)
+	_done()
 
 
 # --- Flow ------------------------------------------------------------------
 
 func _test_flow_warmup() -> void:
-	_group("flow: warmup")
+	_section("flow: warmup")
 
 	var node := _make_match(_quick_rules())
 	node.start(0)
@@ -568,10 +601,11 @@ func _test_flow_warmup() -> void:
 	remove_child(node)
 	warm.queue_free()
 	remove_child(warm)
+	_done()
 
 
 func _test_flow_deathmatch() -> void:
-	_group("flow: a deathmatch to the score limit")
+	_section("flow: a deathmatch to the score limit")
 
 	var node := _make_match(_quick_rules(3))
 	node.start(0)
@@ -639,10 +673,11 @@ func _test_flow_deathmatch() -> void:
 	remove_child(node)
 	timed.queue_free()
 	remove_child(timed)
+	_done()
 
 
 func _test_flow_rounds() -> void:
-	_group("flow: a best-of series")
+	_section("flow: a best-of series")
 
 	var rules := DotMatchRules.team_deathmatch(2)
 	rules.warmup_sec = 0.5
@@ -699,10 +734,11 @@ func _test_flow_rounds() -> void:
 
 	node.queue_free()
 	remove_child(node)
+	_done()
 
 
 func _test_team_assignment() -> void:
-	_group("team assignment")
+	_section("team assignment")
 
 	var node := _make_match(DotMatchRules.team_deathmatch(), true)
 
@@ -744,10 +780,11 @@ func _test_team_assignment() -> void:
 
 	node.queue_free()
 	remove_child(node)
+	_done()
 
 
 func _test_balance() -> void:
-	_group("autobalance")
+	_section("autobalance")
 
 	var node := _make_match(DotMatchRules.team_deathmatch(), true)
 	node.teams.balance_grace_ticks = 0
@@ -792,10 +829,11 @@ func _test_balance() -> void:
 	remove_child(node)
 	graced.queue_free()
 	remove_child(graced)
+	_done()
 
 
 func _test_elimination() -> void:
-	_group("elimination")
+	_section("elimination")
 
 	var rules := DotRulesElimination.make(30.0)
 	rules.warmup_sec = 0.2
@@ -865,10 +903,11 @@ func _test_elimination() -> void:
 	remove_child(mutual)
 	fallback.queue_free()
 	remove_child(fallback)
+	_done()
 
 
 func _test_kills_outside_live() -> void:
-	_group("kills outside a live round")
+	_section("kills outside a live round")
 
 	var node := _make_match(_quick_rules(3))
 	node.start(0)
@@ -902,6 +941,7 @@ func _test_kills_outside_live() -> void:
 
 	node.queue_free()
 	remove_child(node)
+	_done()
 
 
 # --- Net sync --------------------------------------------------------------
@@ -916,7 +956,7 @@ class FakeBehaviour extends Object:
 
 
 func _test_net_sync() -> void:
-	_group("net sync")
+	_section("net sync")
 
 	_check(DotMatchNetSync.specs().size() == 4, "the bridge describes what replicates")
 
@@ -958,10 +998,11 @@ func _test_net_sync() -> void:
 	behaviour.free()
 	node.queue_free()
 	remove_child(node)
+	_done()
 
 
 func _test_team_spawn_tags() -> void:
-	_group("team spawn tags")
+	_section("team spawn tags")
 
 	var node := _make_match(DotMatchRules.team_deathmatch(), true)
 	node.add_player("alice", "Alice", 0)
@@ -997,3 +1038,4 @@ func _test_team_spawn_tags() -> void:
 	_check(node.choose_spawn("alice", 10) != null, "a team with no tag spawns from the whole pool")
 
 	node.queue_free()
+	_done()
