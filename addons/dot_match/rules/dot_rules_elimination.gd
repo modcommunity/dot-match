@@ -22,7 +22,10 @@ var alive_fn: Callable = Callable()
 
 
 static func make(round_sec: float = 120.0) -> DotRulesElimination:
-	var rules := DotRulesElimination.new()
+	# Not this class's own name. A script that names itself in an expression, loaded after
+	# its base, cuts Godot 4.7.2's exit teardown short and leaks every script loaded before
+	# it. See docs/gdscript-hazards.md, "A script that names itself".
+	var rules := new()
 	rules.id = &"elimination"
 	rules.display_name = "Elimination"
 	rules.team_based = true
