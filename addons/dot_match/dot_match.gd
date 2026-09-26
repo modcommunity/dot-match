@@ -266,6 +266,12 @@ func _collect_spawns(node: Node) -> void:
 		_collect_spawns(child)
 
 
+## The match's own list, not a copy — kept that way because callers already hold it.
+##
+## [b]Do not mutate it; use the three methods below.[/b] A caller that clears the array
+## this returns does clear the match's spawns today, but it does so behind the one class
+## that logs and counts them, and any day this returns a copy that caller silently stops
+## working. game-g2gfast did exactly that on every map load until 2026-09-25.
 func spawn_points() -> Array[DotSpawnPoint]:
 	return _spawn_points
 
@@ -274,6 +280,29 @@ func spawn_points() -> Array[DotSpawnPoint]:
 func add_spawn_point(point: DotSpawnPoint) -> void:
 	if point != null and not _spawn_points.has(point):
 		_spawn_points.append(point)
+
+
+## Removes one spawn point. True when it was in the list.
+##
+## The node is left alone: the match never owned it, and a level that is being torn down
+## frees its own nodes. A point removed here is simply never chosen again.
+func remove_spawn_point(point: DotSpawnPoint) -> bool:
+	if point == null:
+		return false
+	var at := _spawn_points.find(point)
+	if at < 0:
+		return false
+	_spawn_points.remove_at(at)
+	return true
+
+
+## Forgets every spawn point, for a level about to be replaced by one built at runtime.
+##
+## Unlike [method refresh_spawns] it does not look again: a game that adds its own points
+## with [method add_spawn_point] calls this first, so the last map's points — freed with the
+## last map's nodes — are not chosen for the next one's players.
+func clear_spawn_points() -> void:
+	_spawn_points.clear()
 
 
 # --- State machine ---------------------------------------------------------
@@ -544,6 +573,15 @@ func switch_team(key: String, team: int, tick: int) -> DotResult:
 ## **Does nothing but note the death outside [constant State.LIVE].** A kill during
 ## warmup must not score, and a kill during intermission must not restart a round that
 ## has already ended.
+##
+## [b]It can end the round before it returns.[/b] In a live round this runs the win check
+## at once, so the kill that reaches the score limit — or eliminates the last of a side —
+## emits [signal round_ended] (and the state change) synchronously, INSIDE this call. A
+## caller that does more after it — another kill in the same volley, a respawn, a stats
+## row, a "last man standing" message — must re-check [method is_live] rather than assume
+## the round it was in is still the round it is in: a second kill reported after the
+## round ended is outside [constant State.LIVE] and does not score, which is correct and
+## surprising the first time.
 func report_kill(
 	killer_key: String,
 	victim_key: String,

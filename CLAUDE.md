@@ -61,6 +61,8 @@ connect farm the second one before the match starts, and a kill during intermiss
 a rocket already in the air when the round ended — would re-run a win check on a round
 that is over.
 
+**And a kill in `LIVE` can end the round before `report_kill` returns.** It runs the win check at once, so the kill that reaches the score limit or eliminates the last of a side emits `round_ended` and the state change synchronously, inside the call. A caller that does more afterwards — a second kill from the same explosion, a stats row, a respawn of its own — has to re-check `is_live()` rather than assume the round it was in is still running: the second of two simultaneous kills is reported outside `LIVE` and does not score. That is correct (the round was decided by the first) and it is documented at the method rather than changed, because every alternative — deferring the check to the next tick — decides a round a tick late.
+
 ## Ending a round clears the respawn queue
 
 A player who died on the round-winning kill must not reappear during the intermission.
@@ -95,6 +97,8 @@ rather than merely felt.
 Threats are **enemies only**, and it is `_threats_against` that filters. A selector that
 avoided the whole roster would scatter a team across the map; in a free-for-all,
 team 0 makes everyone an enemy, which is the right answer there.
+
+**Spawn points are added, removed and cleared through the match.** `add_spawn_point`, `remove_spawn_point` and `clear_spawn_points` (the last two since 2026-09-25). `spawn_points()` returns the match's own array, not a copy, because callers already hold it — but it is not a mutation interface: game-g2gfast cleared that array by reference on every map load, which works only for as long as the return is not a copy. A level built at runtime frees its own nodes and calls `clear_spawn_points()`; the match never owned them.
 
 ## The replicated clock is an absolute end tick
 
@@ -138,7 +142,7 @@ done
 godot --headless --path . res://examples/match_selftest.tscn
 ```
 
-114 checks, all offline. Exits non-zero on any failure.
+123 checks, all offline. Exits non-zero on any failure.
 
 **Run it after any change to the state machine.** The `pause_when_empty` bug parsed
 cleanly and left the match stuck in `COUNTDOWN` forever; nothing but running a round

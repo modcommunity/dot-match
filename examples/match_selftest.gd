@@ -15,7 +15,7 @@ extends Node
 
 const TICK_RATE := 60
 
-const CHECKS := 118
+const CHECKS := 123
 
 ## Sections entered against sections that ran to their last line, and against this. A
 ## runtime error inside a section aborts that function and nothing says so; a section that
@@ -1036,6 +1036,17 @@ func _test_team_spawn_tags() -> void:
 	# ordinary case.
 	node.teams.team(1).spawn_tag = &""
 	_check(node.choose_spawn("alice", 10) != null, "a team with no tag spawns from the whole pool")
+
+	# Taking them away again, through the match rather than through the array it hands out.
+	_check(node.has_method("remove_spawn_point") and node.call("remove_spawn_point", red), "a spawn point can be removed")
+	_check(not node.spawn_points().has(red) and node.spawn_points().size() == 2, "and it is gone from the pool")
+	_check(node.has_method("remove_spawn_point") and not node.call("remove_spawn_point", red), "and removing it twice says it was not there")
+	if node.has_method("clear_spawn_points"):
+		node.call("clear_spawn_points")
+	_check(node.spawn_points().is_empty(), "and every point can be cleared, for a level built at runtime")
+	_check(node.choose_spawn("alice", 9000) == null, "after which nothing is chosen")
+	for point in [red, blue, anywhere]:
+		point.queue_free()
 
 	node.queue_free()
 	_done()
