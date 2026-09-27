@@ -22,7 +22,17 @@ signal balanced(key: String, to_team: int)
 
 @export_group("Teams")
 
-@export var teams: Array[DotTeam] = []
+## The sides. [b]Assigning a new list re-indexes it.[/b] The index used to be built
+## once, on first read, so a game that assigned its own teams after anything had asked
+## (a match node in the tree, a scoreboard) kept the old ones: mg-buses-from-hell
+## called its drivers and runners "Red" and "Blue" on every world, server included,
+## because the ids matched and only the names were stale (`[team-reindex-1]`). Editing
+## the array in place (`teams.append`) does not pass through here; call [method reindex]
+## after doing that.
+@export var teams: Array[DotTeam] = []:
+	set(value):
+		teams = value
+		_indexed = false
 
 @export_group("Balance")
 

@@ -15,7 +15,7 @@ extends Node
 
 const TICK_RATE := 60
 
-const CHECKS := 123
+const CHECKS := 124
 
 ## Sections entered against sections that ran to their last line, and against this. A
 ## runtime error inside a section aborts that function and nothing says so; a section that
@@ -175,6 +175,18 @@ func _test_teams() -> void:
 
 	var spectators := DotTeam.spectators()
 	_check(spectators.is_spectator, "spectators are marked as such")
+
+	# `[team-reindex-1]`: a list assigned after the manager has been read is the list it
+	# answers with. Armed: without the setter the second read still says "Red".
+	var manager := DotTeamManager.new()
+	manager.teams = DotTeam.standard_pair()
+	var before := manager.team(1).display_name if manager.team(1) != null else ""
+	manager.teams = [DotTeam.make(1, "Drivers"), DotTeam.make(2, "Runners")] as Array[DotTeam]
+	var after := manager.team(1).display_name if manager.team(1) != null else ""
+	_check(before != "Drivers" and after == "Drivers" and manager.team(2).display_name == "Runners",
+		"assigning a new team list after the first read is the list the manager answers with",
+		"%s -> %s" % [before, after])
+	manager.free()
 	_done()
 
 
