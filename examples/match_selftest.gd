@@ -15,7 +15,7 @@ extends Node
 
 const TICK_RATE := 60
 
-const CHECKS := 124
+const CHECKS := 126
 
 ## Sections entered against sections that ran to their last line, and against this. A
 ## runtime error inside a section aborts that function and nothing says so; a section that
@@ -465,6 +465,30 @@ func _test_spawn_selection() -> void:
 		"a tie is broken the same way twice",
 		"%s vs %s" % [first.name, again.name]
 	)
+
+	# And broken by the name's TEXT. Node.name is a StringName, and Godot compares two
+	# StringNames by where they were interned, so `point.name < best.name` picked a
+	# different point in a server that built the level from a scene and a client that
+	# built it from a stream. Random names, interned out of text order.
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 20261011
+	var named := _make_spawns(20)
+	var lowest := ""
+	for point in named:
+		var text := "sp_"
+		for _i in range(6):
+			text += char(97 + rng.randi() % 26)
+		point.name = text
+		lowest = text if lowest == "" or text < lowest else lowest
+	var by_name := DotSpawnSelector.new().choose(named, 1000)
+	_check(by_name != null and String(by_name.name) == lowest,
+		"a tie goes to the name first in text order", "%s, want %s" % [by_name.name if by_name != null else "-", lowest])
+	for point in named:
+		point.mark_used(500)
+	var least := DotSpawnSelector.new().choose(named, 501)
+	_check(least != null and String(least.name) == lowest,
+		"and so does a tie among points all on cooldown", "%s, want %s" % [least.name if least != null else "-", lowest])
+	_free_spawns(named)
 
 	# Occupied points are skipped entirely, not merely scored badly: spawning there
 	# is a telefrag.

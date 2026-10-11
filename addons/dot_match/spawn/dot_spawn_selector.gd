@@ -12,6 +12,9 @@ extends RefCounted
 ## them, and leaving the choice to iteration order makes the spawn depend on the order
 ## nodes happened to be added — different on a server that built the level from a
 ## scene and a client that built it from a stream.
+##
+## [b]On the name's text:[/b] `Node.name` is a StringName, and Godot compares two of
+## those by where they were interned, so `a.name < b.name` is the same trap again.
 
 const CHANNEL := "match.spawn"
 
@@ -77,7 +80,7 @@ func choose(
 		if score > best_score:
 			best_score = score
 			best = point
-		elif is_equal_approx(score, best_score) and best != null and point.name < best.name:
+		elif is_equal_approx(score, best_score) and best != null and String(point.name) < String(best.name):
 			best = point
 
 	_selections += 1
@@ -131,7 +134,7 @@ func _fallback(
 	for point in candidates:
 		if point.last_used_tick < best.last_used_tick:
 			best = point
-		elif point.last_used_tick == best.last_used_tick and point.name < best.name:
+		elif point.last_used_tick == best.last_used_tick and String(point.name) < String(best.name):
 			best = point
 
 	return best

@@ -35,7 +35,7 @@ The family's two steps ([game-dev/CLAUDE.md](../../CLAUDE.md#validating-anything
 
 - `DotMatch.tick(current_tick)` is the only thing that advances a match; no `Timer`, `_process` or wall clock. [design](docs/design.md#one-call-moves-the-match-and-everything-is-counted-in-ticks)
 - A threshold and the decision about it live on the same object; what the mode is goes on `DotMatchRules`. [design](docs/design.md#dotmatchrules-is-what-the-mode-is-dotmatchconfig-is-how-the-server-runs-it)
-- Every ordering has an explicit tie-break; never iterate a dictionary to decide. [design](docs/design.md#ordering-is-never-left-to-a-dictionary)
+- Every ordering has an explicit tie-break; never iterate a dictionary to decide. A tie-break on a StringName (`Node.name`, an id) compares `String(…)`: StringNames compare by interning. [design](docs/design.md#ordering-is-never-left-to-a-dictionary)
 - All deaths go through `report_kill` (empty killer = world, equal = suicide); outside `LIVE` it scores nothing. [design](docs/design.md#kills-go-through-one-method)
 - `report_kill` can end the round synchronously; re-check `is_live()` after it. [design](docs/design.md#kills-go-through-one-method)
 - Ending a round clears the respawn queue. [design](docs/design.md#ending-a-round-clears-the-respawn-queue)
