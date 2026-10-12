@@ -319,6 +319,22 @@ func stop(tick: int = -1) -> void:
 	_transition(State.IDLE, tick if tick >= 0 else _current_tick)
 
 
+## Starts a fresh round on this tick, from any state but IDLE: what a map menu's change does
+## (a game sets its next map first, then calls this, and its `round_started` handler builds it).
+##
+## [b]No `round_ended` for the round it replaces, on purpose.[/b] That round was not won or
+## lost, it was called off: an ended round reaches progress, achievements and the "X wins"
+## banner, and a map change is none of those. Round number and scores move on as at any
+## round's start. False when the match is not running.
+func begin_round_now(tick: int = -1) -> bool:
+	if state == State.IDLE:
+		return false
+	var at := tick if tick >= 0 else _current_tick
+	_current_tick = at
+	_begin_round(at)
+	return true
+
+
 func is_live() -> bool:
 	return state == State.LIVE
 

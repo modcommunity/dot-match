@@ -15,13 +15,13 @@ extends Node
 
 const TICK_RATE := 60
 
-const CHECKS := 126
+const CHECKS := 130
 
 ## Sections entered against sections that ran to their last line, and against this. A
 ## runtime error inside a section aborts that function and nothing says so; a section that
 ## bailed out early after a failed guard is counted as not finished on purpose. The CHECKS
 ## total is the other half — see docs/testing.md.
-const SECTIONS := 17
+const SECTIONS := 18
 
 var _passed := 0
 var _failed := 0
@@ -56,6 +56,7 @@ func _run() -> void:
 	_test_elimination()
 	_test_kills_outside_live()
 	_test_net_sync()
+	_test_begin_round_now()
 
 	print("")
 	print("%d passed, %d failed" % [_passed, _failed])
@@ -637,6 +638,34 @@ func _test_flow_warmup() -> void:
 	remove_child(node)
 	warm.queue_free()
 	remove_child(warm)
+	_done()
+
+
+func _test_begin_round_now() -> void:
+	_section("a round started now: what a map change does")
+
+	var idle := _make_match(_quick_rules())
+	_check(not idle.begin_round_now(0), "a match that is not running starts nothing")
+
+	var node := _make_match(_quick_rules())
+	var began: Array = []
+	var ended: Array = []
+	node.round_started.connect(func(n: int) -> void: began.append(n))
+	node.round_ended.connect(func(n: int, _w: int, _o: int) -> void: ended.append(n))
+	node.start(0)
+	node.add_player("alice", "Alice", 0)
+	_check(node.begin_round_now(5) and node.state == DotMatch.State.LIVE and began == [1],
+		"from warmup, alone, a round goes live on that tick")
+	node.add_player("bob", "Bob", 6)
+	node.report_kill("alice", "bob", &"rifle", 7)
+	_check(node.begin_round_now(8) and began == [1, 2] and node.round_number == 2, "mid-round, the next one starts")
+	_check(ended.is_empty() and node.scoreboard.find("alice").kills == 0,
+		"and the round it replaced did not end (no winner, no banner), its scores cleared")
+
+	idle.queue_free()
+	remove_child(idle)
+	node.queue_free()
+	remove_child(node)
 	_done()
 
 

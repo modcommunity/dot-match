@@ -38,6 +38,7 @@ The family's two steps ([game-dev/CLAUDE.md](../../CLAUDE.md#validating-anything
 - Every ordering has an explicit tie-break; never iterate a dictionary to decide. A tie-break on a StringName (`Node.name`, an id) compares `String(…)`: StringNames compare by interning. [design](docs/design.md#ordering-is-never-left-to-a-dictionary)
 - All deaths go through `report_kill` (empty killer = world, equal = suicide); outside `LIVE` it scores nothing. [design](docs/design.md#kills-go-through-one-method)
 - `report_kill` can end the round synchronously; re-check `is_live()` after it. [design](docs/design.md#kills-go-through-one-method)
+- `begin_round_now(tick)` starts a fresh round from any running state with no `round_ended` for the one it replaces: a map change calls a round off, nobody won it. [design](docs/design.md#ending-a-round-clears-the-respawn-queue)
 - Ending a round clears the respawn queue. [design](docs/design.md#ending-a-round-clears-the-respawn-queue)
 - Autobalance only between rounds, with a grace period, bounded, moving the longest-serving player. [design](docs/design.md#autobalance-runs-between-rounds-not-during-them)
 - Spawn selection falls back rather than refusing; threats are enemies only. [design](docs/design.md#spawn-selection-gives-up-gracefully)
