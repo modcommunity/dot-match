@@ -53,6 +53,8 @@ Threats are **enemies only**, filtered by `DotMatch._threats_against`. A selecto
 
 **Spawn points are added, removed and cleared through the match**: `add_spawn_point`, `remove_spawn_point`, `clear_spawn_points`. `spawn_points()` returns the match's own array, not a copy, because callers already hold it, but it is not a mutation interface: a game once cleared that array by reference on every map load, which works only while the return is not a copy. A level built at runtime frees its own nodes and calls `clear_spawn_points()`; the match never owned them.
 
+**A freed point is forgotten, never walked.** With no `spawns_ref` the match collects every `DotSpawnPoint` under the current scene, which in a process holding two games includes the other one's. Every path that walks the list (`_begin_round`'s reset, `choose_spawn`, `spawn_points()`) drops freed points first (`_forget_freed_spawns`); a game that knows where its points are still sets `spawns_ref`. ([history](history.md#a-freed-spawn-point-crashed-the-engine))
+
 ## The replicated clock is an absolute end tick
 
 `DotMatchNetSync` sends `net_ends_at`, not seconds remaining. A relative value would have to be re-sent every tick to stay accurate; an absolute end tick goes out once per state change, and every client counts down from the clock it already shares with the server (dot-net's). `seconds_remaining` returns -1 for "no clock" on both server and client, so a HUD has one branch.

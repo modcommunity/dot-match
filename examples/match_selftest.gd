@@ -15,13 +15,13 @@ extends Node
 
 const TICK_RATE := 60
 
-const CHECKS := 130
+const CHECKS := 135
 
 ## Sections entered against sections that ran to their last line, and against this. A
 ## runtime error inside a section aborts that function and nothing says so; a section that
 ## bailed out early after a failed guard is counted as not finished on purpose. The CHECKS
 ## total is the other half — see docs/testing.md.
-const SECTIONS := 18
+const SECTIONS := 19
 
 var _passed := 0
 var _failed := 0
@@ -57,6 +57,7 @@ func _run() -> void:
 	_test_kills_outside_live()
 	_test_net_sync()
 	_test_begin_round_now()
+	_test_freed_spawn_points()
 
 	print("")
 	print("%d passed, %d failed" % [_passed, _failed])
@@ -666,6 +667,39 @@ func _test_begin_round_now() -> void:
 	remove_child(idle)
 	node.queue_free()
 	remove_child(node)
+	_done()
+
+
+## A point the match collected and somebody else freed. With no spawns_ref the match gathers
+## every point under the current scene, which in a process holding two games includes the
+## other one's; game-hungario's solo mode change built a fresh client beside the old one, freed
+## the old one, and the next round's `point.reset()` crashed the engine (signal 11).
+func _test_freed_spawn_points() -> void:
+	_section("a spawn point freed under the match is forgotten, not reset")
+
+	var foreign := DotSpawnPoint.make(Vector3(5.0, 0.0, 0.0))
+	foreign.name = "OtherGamesSpawn"
+	add_child(foreign)
+	var own := _make_match(_quick_rules())
+	_check(own.spawn_points().has(foreign), "with no spawns_ref the match collects another game's point")
+
+	var before := own.spawn_points().size()
+	own.start(0)
+	own.add_player("alice", "Alice", 0)
+	own.add_player("bob", "Bob", 0)
+	remove_child(foreign)
+	foreign.free()
+
+	var tick := _advance(own, 1, int(2.0 * float(TICK_RATE)))
+	_check(own.state == DotMatch.State.LIVE, "the round still begins after it was freed", str(own.state))
+	var left := own.spawn_points()
+	_check(left.size() == before - 1 and left.all(func(p: DotSpawnPoint) -> bool: return is_instance_valid(p)),
+		"and the freed point is gone from the list, the others kept", "%d of %d" % [left.size(), before])
+	_check(own.choose_spawn("alice", tick) != null, "and a spawn is still chosen from them")
+	_check(own.begin_round_now(tick + 1) and own.round_number == 2, "a round started now walks the list too")
+
+	own.queue_free()
+	remove_child(own)
 	_done()
 
 

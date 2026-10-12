@@ -273,6 +273,7 @@ func _collect_spawns(node: Node) -> void:
 ## that logs and counts them, and any day this returns a copy that caller silently stops
 ## working. game-g2gfast did exactly that on every map load until 2026-09-25.
 func spawn_points() -> Array[DotSpawnPoint]:
+	_forget_freed_spawns()
 	return _spawn_points
 
 
@@ -294,6 +295,21 @@ func remove_spawn_point(point: DotSpawnPoint) -> bool:
 		return false
 	_spawn_points.remove_at(at)
 	return true
+
+
+## Drops every point that was freed under the match.
+##
+## [b]The list holds nodes the match never owned.[/b] With no [member spawns_ref],
+## [method refresh_spawns] collects every [DotSpawnPoint] under the current scene, which in
+## a process holding two games (a client replaced by a fresh one, a suite building several)
+## includes the other game's, and that game frees its nodes when it goes. A freed point left
+## here crashed the engine outright (signal 11, not a script error) on the next round's
+## `point.reset()`: game-hungario's solo mode change, 2026-10-12. So every path that walks
+## the list forgets the freed ones first.
+func _forget_freed_spawns() -> void:
+	for i in range(_spawn_points.size() - 1, -1, -1):
+		if not is_instance_valid(_spawn_points[i]):
+			_spawn_points.remove_at(i)
 
 
 ## Forgets every spawn point, for a level about to be replaced by one built at runtime.
@@ -455,6 +471,7 @@ func _begin_round(current_tick: int) -> void:
 	feed.clear()
 	respawns.clear()
 
+	_forget_freed_spawns()
 	for point in _spawn_points:
 		point.reset()
 
@@ -711,6 +728,7 @@ func choose_spawn(key: String, tick: int, tag: StringName = &"") -> DotSpawnPoin
 	# and [method refresh_spawns] has already warned once if that was an accident. Asking
 	# anyway produced a warning per player per round, for ever, on a server configured
 	# exactly as its game intended.
+	_forget_freed_spawns()
 	if _spawn_points.is_empty():
 		return null
 

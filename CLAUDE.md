@@ -43,6 +43,7 @@ The family's two steps ([game-dev/CLAUDE.md](../../CLAUDE.md#validating-anything
 - Autobalance only between rounds, with a grace period, bounded, moving the longest-serving player. [design](docs/design.md#autobalance-runs-between-rounds-not-during-them)
 - Spawn selection falls back rather than refusing; threats are enemies only. [design](docs/design.md#spawn-selection-gives-up-gracefully)
 - Change spawn points only through `add_` / `remove_` / `clear_spawn_points`; never mutate the array `spawn_points()` returns. [design](docs/design.md#spawn-selection-gives-up-gracefully)
+- Without `spawns_ref` the match collects every point under the current scene, another game's too; a freed one is dropped before any walk of the list (`_forget_freed_spawns`), never reset. [design](docs/design.md#spawn-selection-gives-up-gracefully)
 - Replicate the absolute end tick; `seconds_remaining` is -1 for no clock on both sides. [design](docs/design.md#the-replicated-clock-is-an-absolute-end-tick)
 - Name no class outside dot-core; nothing here spawns anything. [design](docs/design.md#coupling-nothing-is-imported)
 
