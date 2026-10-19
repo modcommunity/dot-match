@@ -45,6 +45,8 @@ A match is a state machine, `WARMUP → COUNTDOWN → LIVE → INTERMISSION → 
 
 A match that ticks itself ticks on whatever schedule the engine gives it, which is not the schedule the simulation runs on. A server whose round timer and whose netcode disagree about what time it is produces a round that ends on a different tick for every client.
 
+**One warmup, then a frozen countdown.** `WARMUP` is the only open wait: it runs on `start()` and when the server drops below `min_players`. Every round after it, whether it follows warmup, an intermission or a match end with players still present, goes through `COUNTDOWN` (`countdown_sec`, default 5): the round is reset, every present player is placed at a round spawn (`respawn_due`) and held still. `is_frozen()` is true for exactly that state (when `rules.freeze_during_countdown`), `freeze_changed(frozen)` announces the edges, and `round_started` fires at `LIVE` without respawning anyone. A player who joins or dies during the countdown is placed frozen too. dot-match owns no bodies, so the game freezes its controllers.
+
 What *winning* means lives in a `DotMatchRules` resource. `DotMatch` never asks what mode it is running.
 
 ## What is in the box

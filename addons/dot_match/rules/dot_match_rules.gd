@@ -84,8 +84,14 @@ enum Outcome {
 ## Players needed before warmup can end. One lets a solo player start.
 @export_range(1, 64, 1) var min_players: int = 2
 
-## Seconds between "go" being decided and the round actually starting.
+## Seconds everyone stands at their spawn before the round goes live. Entered straight
+## from warmup, from a round's intermission and from the match end (when enough players
+## are still there), so this is the only wait a new round has besides the one warmup. Zero skips the countdown: the round goes live first and everyone is placed right after `round_started`, the order a game that builds its round in that handler relies on.
 @export_range(0.0, 30.0, 0.5) var countdown_sec: float = 5.0
+
+## Hold every player still during the countdown. dot-match owns no bodies: it reports
+## [method DotMatch.is_frozen] and the game freezes its controllers.
+@export var freeze_during_countdown: bool = true
 
 ## Seconds a round-end screen is shown before the next round.
 @export_range(0.0, 120.0, 1.0) var intermission_sec: float = 10.0

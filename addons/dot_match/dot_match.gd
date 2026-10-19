@@ -36,7 +36,9 @@ enum State {
 	IDLE,
 	## Waiting for players, or for the warmup clock. Nobody scores.
 	WARMUP,
-	## Everyone is in and the round is about to start.
+	## The round is set up and about to start: everyone present has been placed at a
+	## round spawn and, when [member DotMatchRules.freeze_during_countdown] is on, is
+	## held still by the game (see [method is_frozen]). Nobody scores.
 	COUNTDOWN,
 	## The round is running.
 	LIVE,
@@ -48,8 +50,22 @@ enum State {
 
 signal state_changed(from: State, to: State)
 
-## A round began. [param round_number] is 1-based.
+## A round is being set up: the countdown began, scores and the feed are reset and every
+## present player is being placed (one [signal respawn_due] each, right after this).
+## [param round_number] is 1-based and is the number of the round about to go live; it
+## increments here, not at [signal round_started]. A game that builds a map or a round
+## layout does it on this signal, before the spawns that follow.
+signal round_preparing(round_number: int)
+
+## The round went live. [param round_number] is 1-based and equal to the one
+## [signal round_preparing] announced. Nobody is respawned here: they were placed when
+## the countdown began. (A round started by [method begin_round_now] skips the countdown
+## and places everyone right after this signal, as it always did.)
 signal round_started(round_number: int)
+
+## Whether players should be held still changed; see [method is_frozen]. Emitted from
+## the state change, after [signal state_changed].
+signal freeze_changed(frozen: bool)
 
 ## A round ended. [param winner] is a team id in team mode and 0 otherwise; check
 ## [param outcome] to tell a draw from a free-for-all.
@@ -114,7 +130,7 @@ var position_fn: Callable = Callable()
 
 var state: State = State.IDLE
 
-## 1-based. Zero before the first round.
+## 1-based. Zero before the first round. Incremented when the countdown begins.
 var round_number: int = 0
 
 ## Tick the current state began on.
@@ -324,11 +340,15 @@ func clear_spawn_points() -> void:
 # --- State machine ---------------------------------------------------------
 
 func start(tick: int = 0) -> void:
+	_reset_match(tick)
+	_transition(State.WARMUP, tick)
+
+
+func _reset_match(tick: int) -> void:
 	_current_tick = tick
 	round_number = 0
 	rounds_won.clear()
 	scoreboard.reset_match()
-	_transition(State.WARMUP, tick)
 
 
 func stop(tick: int = -1) -> void:
@@ -347,12 +367,22 @@ func begin_round_now(tick: int = -1) -> bool:
 		return false
 	var at := tick if tick >= 0 else _current_tick
 	_current_tick = at
-	_begin_round(at)
+	# No countdown: the caller (a map change) builds its round on round_started, which
+	# must still run before anyone is placed.
+	_begin_round_live(at)
 	return true
 
 
 func is_live() -> bool:
 	return state == State.LIVE
+
+
+## Whether the game should hold every player still: the countdown, when the rules freeze
+## it. dot-match owns no bodies, so the game does the freezing (for example
+## `DotFpsAdminModifiers.set_frozen`) from this or from [signal freeze_changed]; a player
+## spawned during the countdown is spawned frozen too, because this stays true until LIVE.
+func is_frozen() -> bool:
+	return state == State.COUNTDOWN and rules != null and rules.freeze_during_countdown
 
 
 ## Whether scoring counts. Warmup deliberately does not.
@@ -365,6 +395,7 @@ func _transition(to: State, tick: int) -> void:
 		return
 
 	var from := state
+	var was_frozen := is_frozen()
 	state = to
 	state_since_tick = tick
 
@@ -377,6 +408,9 @@ func _transition(to: State, tick: int) -> void:
 		})
 
 	state_changed.emit(from, to)
+
+	if was_frozen != is_frozen():
+		freeze_changed.emit(is_frozen())
 
 
 func _ticks_in_state(tick: int) -> int:
@@ -450,21 +484,29 @@ func _tick_warmup(current_tick: int) -> void:
 	if rules.warmup_sec > 0.0 and seconds_in_state(current_tick) < rules.warmup_sec:
 		return
 
-	_transition(State.COUNTDOWN, current_tick)
+	_prepare_round(current_tick)
 
 
 func _tick_countdown(current_tick: int) -> void:
 	if rules.pause_when_empty and not _enough_players():
+		# The round never went live, so its number is handed back: the warmup that
+		# follows will prepare the same round again.
+		round_number -= 1
+		respawns.clear()
 		_transition(State.WARMUP, current_tick)
 		return
 
 	if seconds_in_state(current_tick) < rules.countdown_sec:
 		return
 
-	_begin_round(current_tick)
+	# Placed and frozen since the countdown began; going live only lets go. Respawning
+	# here would move everyone a second time, the "spawns twice" this flow removed.
+	_transition(State.LIVE, current_tick)
+	round_started.emit(round_number)
 
 
-func _begin_round(current_tick: int) -> void:
+## The round's reset, shared by the countdown and a round started now.
+func _reset_for_round(current_tick: int) -> void:
 	round_number += 1
 
 	scoreboard.reset_scores()
@@ -477,6 +519,38 @@ func _begin_round(current_tick: int) -> void:
 
 	if config.balance_between_rounds and rules.team_based:
 		teams.rebalance(current_tick)
+
+
+## Enters COUNTDOWN: resets the round and places every present player at once.
+##
+## [b]Placing happens here and not at LIVE[/b] so the wait before a round is spent
+## standing at the spawn, frozen, instead of counting down while everyone is somewhere
+## else (or nowhere) and then being teleported at "go".
+func _prepare_round(current_tick: int) -> void:
+	# A mode with no countdown (`countdown_sec` 0) keeps the old order: live first, then
+	# placed. Eight games build their round (map layout, roles) in `round_started` and
+	# place players after it; a countdown of zero ticks would have put players down
+	# before that handler ran.
+	if rules.countdown_sec <= 0.0:
+		_begin_round_live(current_tick)
+		return
+
+	_reset_for_round(current_tick)
+
+	_transition(State.COUNTDOWN, current_tick)
+	round_preparing.emit(round_number)
+
+	# Everyone in at once, on this tick: a round that started by leaving people in the
+	# respawn queue would begin with half the players still dead.
+	for record in scoreboard.present_players():
+		respawns.enqueue_at(record.key, current_tick)
+
+	_drain_respawns(current_tick)
+
+
+## Straight to LIVE, no countdown. Only [method begin_round_now] uses it.
+func _begin_round_live(current_tick: int) -> void:
+	_reset_for_round(current_tick)
 
 	_transition(State.LIVE, current_tick)
 	round_started.emit(round_number)
@@ -548,11 +622,18 @@ func _tick_intermission(current_tick: int) -> void:
 		_transition(State.WARMUP, current_tick)
 		return
 
-	_begin_round(current_tick)
+	_prepare_round(current_tick)
 
 
 func _tick_match_end(current_tick: int) -> void:
 	if seconds_in_state(current_tick) < rules.match_end_sec:
+		return
+
+	# They just played together: a second warmup would be the same wait twice. Only a
+	# server that emptied during the scoreboard goes back to waiting for players.
+	if _enough_players():
+		_reset_match(current_tick)
+		_prepare_round(current_tick)
 		return
 
 	start(current_tick)
@@ -574,7 +655,10 @@ func add_player(key: String, display_name: String, tick: int, wanted_team: int =
 	# A player joining mid-round is queued rather than spawned here: spawning from a
 	# join handler puts them in the world before whatever the game does on join has
 	# run, and the respawn path already knows how to pick a safe point.
-	if is_live() and not rules.respawn_disabled:
+	# During the countdown too, and at once: the player arrives frozen with everyone else.
+	if state == State.COUNTDOWN and not rules.respawn_disabled:
+		respawns.enqueue_at(key, tick)
+	elif is_live() and not rules.respawn_disabled:
 		respawns.enqueue(key, tick, rules.respawn_delay_sec)
 
 	return DotResult.success(record)
@@ -703,7 +787,7 @@ func report_damage(dealer_key: String, victim_key: String, amount: float) -> voi
 # --- Spawning --------------------------------------------------------------
 
 func _drain_respawns(current_tick: int) -> void:
-	if state != State.LIVE:
+	if state != State.LIVE and state != State.COUNTDOWN:
 		return
 
 	for key in respawns.take_ready(current_tick):
@@ -823,6 +907,7 @@ func describe() -> Dictionary:
 	return {
 		"state": State.keys()[state],
 		"round": round_number,
+		"frozen": is_frozen(),
 		"rules": rules.describe() if rules != null else {},
 		"remaining": seconds_remaining(),
 		"players": scoreboard.present_count(),

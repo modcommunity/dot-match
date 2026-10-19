@@ -15,13 +15,13 @@ extends Node
 
 const TICK_RATE := 60
 
-const CHECKS := 135
+const CHECKS := 162
 
 ## Sections entered against sections that ran to their last line, and against this. A
 ## runtime error inside a section aborts that function and nothing says so; a section that
 ## bailed out early after a failed guard is counted as not finished on purpose. The CHECKS
 ## total is the other half — see docs/testing.md.
-const SECTIONS := 19
+const SECTIONS := 20
 
 var _passed := 0
 var _failed := 0
@@ -57,6 +57,7 @@ func _run() -> void:
 	_test_kills_outside_live()
 	_test_net_sync()
 	_test_begin_round_now()
+	_test_countdown_flow()
 	_test_freed_spawn_points()
 
 	print("")
@@ -667,6 +668,152 @@ func _test_begin_round_now() -> void:
 	remove_child(idle)
 	node.queue_free()
 	remove_child(node)
+	_done()
+
+
+func _test_countdown_flow() -> void:
+	_section("flow: one warmup, then a frozen countdown before every round")
+
+	var rules := DotMatchRules.deathmatch(1)
+	rules.warmup_sec = 1.0
+	rules.countdown_sec = 1.0
+	rules.time_limit_sec = 10.0
+	rules.min_players = 2
+	rules.respawn_delay_sec = 0.5
+	rules.intermission_sec = 1.0
+	rules.match_end_sec = 1.0
+	rules.rounds_to_win = 2
+
+	var node := _make_match(rules)
+	var points := _make_spawns(4)
+	for point in points:
+		node.add_spawn_point(point)
+
+	var spawned: Array = []
+	var states: Array = []
+	var freezes: Array = []
+	var prepared: Array = []
+	var started: Array = []
+	node.respawn_due.connect(func(key: String, _s: DotSpawnPoint, t: int) -> void: spawned.append([key, node.state, t]))
+	node.state_changed.connect(func(_f: int, to: int) -> void: states.append(to))
+	node.freeze_changed.connect(func(f: bool) -> void: freezes.append(f))
+	node.round_preparing.connect(func(n: int) -> void: prepared.append(n))
+	node.round_started.connect(func(n: int) -> void: started.append(n))
+
+	_check(not node.is_frozen(), "not frozen before the match runs")
+	node.start(0)
+	node.add_player("alice", "Alice", 0)
+	node.add_player("bob", "Bob", 0)
+
+	var tick := _advance(node, 1, 61)
+	_check(node.state == DotMatch.State.COUNTDOWN, "warmup ends in the countdown", DotMatch.State.keys()[node.state])
+	_check(node.is_frozen() and freezes == [true], "which is frozen, announced once")
+	_check(prepared == [1] and node.round_number == 1, "round one is announced as preparing")
+	_check(spawned.size() == 2 and spawned[0][1] == DotMatch.State.COUNTDOWN,
+		"everyone is placed at the countdown's entry", str(spawned.size()))
+
+	# Not before the countdown: nobody was spawned by the warmup.
+	var at_entry := spawned.size()
+	node.add_player("carol", "Carol", tick)
+	tick = _advance(node, tick, 2)
+	_check(spawned.size() == at_entry + 1 and spawned[-1][0] == "carol" and node.is_frozen(),
+		"a player joining during the countdown is placed, still frozen")
+
+	# A death in the countdown (a fall, an admin slay) returns frozen as well.
+	node.report_kill("", "bob", &"world", tick)
+	_check(node.scoreboard.find("bob").score == 0, "a kill in the countdown scores nothing")
+	tick = _advance(node, tick, 40)
+	_check(spawned[-1][0] == "bob" and spawned[-1][1] == DotMatch.State.COUNTDOWN,
+		"a death in the countdown respawns during it")
+
+	tick = _advance(node, tick, 40)
+	_check(node.state == DotMatch.State.LIVE and not node.is_frozen(), "then it goes live and lets go")
+	_check(freezes == [true, false] and started == [1], "round_started and the unfreeze come at LIVE")
+	var before_live := spawned.size()
+	tick = _advance(node, tick, 5)
+	_check(spawned.size() == before_live, "and nobody is respawned a second time")
+
+	# The round ends; the intermission leads to a countdown, not to LIVE.
+	node.report_kill("alice", "bob", &"rifle", tick)
+	_check(node.state == DotMatch.State.INTERMISSION and not node.is_frozen(), "a won round gives an intermission, unfrozen")
+	var before_inter := spawned.size()
+	tick = _advance(node, tick, 62)
+	_check(node.state == DotMatch.State.COUNTDOWN and node.is_frozen(), "the intermission leads to a frozen countdown")
+	_check(prepared == [1, 2] and node.round_number == 2, "round two is preparing")
+	_check(spawned.size() == before_inter + 3 and node.scoreboard.find("alice").score == 0,
+		"everyone is placed again and the scores are reset")
+	tick = _advance(node, tick, 62)
+	_check(node.state == DotMatch.State.LIVE and started == [1, 2], "round two goes live")
+
+	# Short of players: back to the one warmup, and the round number is handed back.
+	node.report_kill("alice", "bob", &"rifle", tick)
+	tick = _advance(node, tick, 62)
+	_check(node.state == DotMatch.State.COUNTDOWN and node.round_number == 3, "round three is preparing")
+	node.remove_player("alice")
+	node.remove_player("bob")
+	node.remove_player("carol")
+	tick = _advance(node, tick, 2)
+	_check(node.state == DotMatch.State.WARMUP and not node.is_frozen() and node.round_number == 2,
+		"a countdown that loses its players returns to warmup, unfrozen")
+	_check(freezes[-1] == false, "and says so")
+
+	# Match end, with players still there: no second warmup.
+	var fin := _make_match(rules)
+	fin.rules.rounds_to_win = 1
+	var fin_states: Array = []
+	fin.state_changed.connect(func(_f: int, to: int) -> void: fin_states.append(to))
+	fin.start(0)
+	fin.add_player("a", "A", 0)
+	fin.add_player("b", "B", 0)
+	var ftick := _advance(fin, 1, 124)
+	fin.report_kill("a", "b", &"rifle", ftick)
+	_check(fin.state == DotMatch.State.MATCH_END, "the match ends", DotMatch.State.keys()[fin.state])
+	ftick = _advance(fin, ftick, 62)
+	_check(fin.state == DotMatch.State.COUNTDOWN and fin_states.count(DotMatch.State.WARMUP) == 1 and fin.is_frozen(),
+		"the match end leads to a frozen countdown with players present, not a second warmup")
+	_check(fin.round_number == 1 and fin.rounds_won.is_empty(), "as round one of a fresh match")
+
+	# A match end with nobody left is a warmup.
+	var empty := _make_match(rules)
+	empty.rules.rounds_to_win = 1
+	empty.start(0)
+	empty.add_player("a", "A", 0)
+	empty.add_player("b", "B", 0)
+	var etick := _advance(empty, 1, 62)
+	etick = _advance(empty, etick, 62)
+	empty.report_kill("a", "b", &"rifle", etick)
+	_check(empty.state == DotMatch.State.MATCH_END, "a one-round match ends", DotMatch.State.keys()[empty.state])
+	empty.remove_player("a")
+	empty.remove_player("b")
+	etick = _advance(empty, etick, 62)
+	_check(empty.state == DotMatch.State.WARMUP, "a match end with nobody left is a warmup")
+	_check(empty.rules.freeze_during_countdown and empty.rules.countdown_sec == 1.0, "freezing is on by default")
+
+	var off := _make_match(rules.duplicate())
+	off.rules.freeze_during_countdown = false
+	off.start(0)
+	off.add_player("a", "A", 0)
+	off.add_player("b", "B", 0)
+	_advance(off, 1, 62)
+	_check(off.state == DotMatch.State.COUNTDOWN and not off.is_frozen(), "a mode can turn the freeze off")
+
+	# countdown_sec 0 keeps the old order: live first, then placed.
+	var zero := _make_match(rules.duplicate())
+	zero.rules.countdown_sec = 0.0
+	var order: Array = []
+	zero.round_started.connect(func(_n: int) -> void: order.append("started"))
+	zero.respawn_due.connect(func(_k: String, _s: DotSpawnPoint, _t: int) -> void: order.append("spawn"))
+	zero.start(0)
+	zero.add_player("a", "A", 0)
+	zero.add_player("b", "B", 0)
+	_advance(zero, 1, 62)
+	_check(zero.state == DotMatch.State.LIVE and order == ["started", "spawn", "spawn"] and not zero.is_frozen(),
+		"a zero countdown skips the freeze and places players after round_started", str(order))
+
+	_free_spawns(points)
+	for each in [node, fin, empty, off, zero]:
+		each.queue_free()
+		remove_child(each)
 	_done()
 
 

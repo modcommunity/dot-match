@@ -33,6 +33,14 @@ Team assignment is the one where the consequence is not cosmetic: a server and c
 
 **A kill in `LIVE` can end the round before `report_kill` returns.** It runs the win check at once, so the kill that reaches the score limit or eliminates the last of a side emits `round_ended` and the state change synchronously, inside the call. A caller that does more afterwards (a second kill from the same explosion, a stats row, its own respawn) re-checks `is_live()`: the second of two simultaneous kills is reported outside `LIVE` and does not score. That is correct (the first decided the round) and is documented at the method rather than changed, because deferring the check decides a round a tick late.
 
+## One warmup, then a frozen countdown before every round
+
+`WARMUP` is the one open wait, entered by `start()` and by falling below `min_players`. Warmup, `INTERMISSION` and `MATCH_END` (when `min_players` are still present; otherwise the match restarts into warmup) all lead to `COUNTDOWN`, because a second warmup after a match the same players just played, or a round that began with everyone standing wherever they died, was the "counts down three times" the flow replaced.
+
+Entering `COUNTDOWN` is the round's start in every way but the clock: `round_number` increments, scores and the feed reset, spawn points reset, teams rebalance, `round_preparing(round_number)` is emitted and every present player is queued for this tick and placed (`respawn_due`). `round_number` increments here and `round_started` repeats the same number at `LIVE`, where nobody is respawned. `countdown_sec` of 0 skips all of this and starts the round live with the placing after `round_started`, so a game that lays its round out in that handler (most of them) is unchanged. A countdown that loses its players hands the number back and returns to warmup.
+
+Freezing is the game's job: `is_frozen()` (state is `COUNTDOWN` and `rules.freeze_during_countdown`) and `freeze_changed(frozen)` say when. A join or a death during the countdown is placed at once, so it is frozen too. A client needs only the replicated `net_state` plus its own copy of the rules to know it is frozen. `begin_round_now` (a map change) still skips the countdown: it goes live and places everyone right after `round_started`, as before, because its caller builds the map in that handler.
+
 ## Ending a round clears the respawn queue
 
 A player who died on the round-winning kill must not reappear during the intermission. The self-test asserts exactly two respawns across three kills for this reason, and its comment says so, because "3 kills, 2 respawns" reads as an off-by-one otherwise.
