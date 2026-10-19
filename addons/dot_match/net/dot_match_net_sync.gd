@@ -65,6 +65,15 @@ static func specs() -> Array[Dictionary]:
 			"bits": 6,
 			"interpolated": false,
 		},
+		{
+			# Appended last and optional, so an older bridge's wire format is unchanged:
+			# one that never declares it makes pull()'s set a no-op, and is_frozen()
+			# then treats every countdown as frozen.
+			"property": &"net_frozen",
+			"type": "UINT",
+			"bits": 1,
+			"interpolated": false,
+		},
 	]
 
 
@@ -87,6 +96,7 @@ static func pull(match_node: DotMatch, target: Object, _tick: int) -> void:
 	target.set(&"net_state", int(match_node.state))
 	target.set(&"net_round", clampi(match_node.round_number, 0, (1 << ROUND_BITS) - 1))
 	target.set(&"net_winner", clampi(match_node.last_winner(), 0, 63))
+	target.set(&"net_frozen", 1 if match_node.is_frozen() else 0)
 
 	var remaining := match_node.seconds_remaining()
 
@@ -98,6 +108,16 @@ static func pull(match_node: DotMatch, target: Object, _tick: int) -> void:
 		&"net_ends_at",
 		maxi(0, _tick + int(round(remaining * float(match_node.config.tick_rate))))
 	)
+
+
+## Whether a client should hold its player still, from replicated data alone: the
+## server's decision (its rules' `freeze_during_countdown`), not the client's copy.
+## A bridge compares this across pulls to raise its own freeze_changed.
+static func is_frozen(source: Object) -> bool:
+	if source == null or int(source.get(&"net_state")) != int(DotMatch.State.COUNTDOWN):
+		return false
+	var flag: Variant = source.get(&"net_frozen")
+	return flag == null or int(flag) != 0
 
 
 ## Seconds left on a client, from the replicated end tick and the client's own tick.
@@ -121,4 +141,4 @@ static func seconds_remaining(
 
 
 static func estimated_bits() -> int:
-	return STATE_BITS + ROUND_BITS + TICK_BITS + 6
+	return STATE_BITS + ROUND_BITS + TICK_BITS + 6 + 1

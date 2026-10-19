@@ -63,6 +63,14 @@ signal round_preparing(round_number: int)
 ## and places everyone right after this signal, as it always did.)
 signal round_started(round_number: int)
 
+## The countdown ended and the round is live; emitted just before [signal round_started],
+## and only when players were placed during a countdown. [b]Spawn protection granted at
+## the countdown placement ran out inside the freeze[/b] (2 s of protection in a 5 s
+## countdown), so a game re-arms it here for everyone it placed while [method is_frozen]
+## was true, for [method spawn_protection_ticks] from [param tick]. Or it grants none
+## while frozen; either way the protection must count from this tick.
+signal players_released(tick: int)
+
 ## Whether players should be held still changed; see [method is_frozen]. Emitted from
 ## the state change, after [signal state_changed].
 signal freeze_changed(frozen: bool)
@@ -352,6 +360,11 @@ func _reset_match(tick: int) -> void:
 
 
 func stop(tick: int = -1) -> void:
+	# A countdown that is cut off never produced its round, so the number goes back
+	# (as in the fall back to warmup) and nobody queued for placement is placed later.
+	if state == State.COUNTDOWN:
+		round_number -= 1
+	respawns.clear()
 	_transition(State.IDLE, tick if tick >= 0 else _current_tick)
 
 
@@ -367,6 +380,11 @@ func begin_round_now(tick: int = -1) -> bool:
 		return false
 	var at := tick if tick >= 0 else _current_tick
 	_current_tick = at
+	if state == State.COUNTDOWN:
+		# Already reset, numbered and placed: a second reset would announce n+1 after
+		# round_preparing(n) and place everyone twice. Just let go.
+		_go_live(at)
+		return true
 	# No countdown: the caller (a map change) builds its round on round_started, which
 	# must still run before anyone is placed.
 	_begin_round_live(at)
@@ -501,7 +519,13 @@ func _tick_countdown(current_tick: int) -> void:
 
 	# Placed and frozen since the countdown began; going live only lets go. Respawning
 	# here would move everyone a second time, the "spawns twice" this flow removed.
+	_go_live(current_tick)
+
+
+func _go_live(current_tick: int) -> void:
 	_transition(State.LIVE, current_tick)
+	# Before round_started so a handler there sees protection already re-armed.
+	players_released.emit(current_tick)
 	round_started.emit(round_number)
 
 

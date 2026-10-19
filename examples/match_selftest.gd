@@ -15,7 +15,7 @@ extends Node
 
 const TICK_RATE := 60
 
-const CHECKS := 162
+const CHECKS := 170
 
 ## Sections entered against sections that ran to their last line, and against this. A
 ## runtime error inside a section aborts that function and nothing says so; a section that
@@ -671,6 +671,21 @@ func _test_begin_round_now() -> void:
 	_done()
 
 
+## A full countdown, to see players_released fire once at LIVE.
+func node_released_ok(rules: DotMatchRules) -> bool:
+	var m := _make_match(rules.duplicate())
+	var hits: Array = []
+	m.players_released.connect(func(t: int) -> void: hits.append(t))
+	m.start(0)
+	m.add_player("a", "A", 0)
+	m.add_player("b", "B", 0)
+	_advance(m, 1, 124)
+	var ok := m.state == DotMatch.State.LIVE and hits.size() == 1
+	m.queue_free()
+	remove_child(m)
+	return ok
+
+
 func _test_countdown_flow() -> void:
 	_section("flow: one warmup, then a frozen countdown before every round")
 
@@ -797,6 +812,69 @@ func _test_countdown_flow() -> void:
 	_advance(off, 1, 62)
 	_check(off.state == DotMatch.State.COUNTDOWN and not off.is_frozen(), "a mode can turn the freeze off")
 
+	# begin_round_now inside a countdown goes live on the prepared round.
+	var cut := _make_match(rules.duplicate())
+	var cut_prep: Array = []
+	var cut_start: Array = []
+	var cut_spawn: Array = []
+	var released: Array = []
+	cut.round_preparing.connect(func(n: int) -> void: cut_prep.append(n))
+	cut.round_started.connect(func(n: int) -> void: cut_start.append(n))
+	cut.respawn_due.connect(func(k: String, _s: DotSpawnPoint, _t: int) -> void: cut_spawn.append(k))
+	cut.players_released.connect(func(t: int) -> void: released.append(t))
+	cut.start(0)
+	cut.add_player("a", "A", 0)
+	cut.add_player("b", "B", 0)
+	var ctick := _advance(cut, 1, 62)
+	_check(cut.state == DotMatch.State.COUNTDOWN and cut_spawn.size() == 2, "a countdown to cut short")
+	cut.begin_round_now(ctick)
+	_check(cut.state == DotMatch.State.LIVE and cut_prep == [1] and cut_start == [1] and cut.round_number == 1,
+		"begin_round_now in a countdown keeps the number", str([cut_prep, cut_start]))
+	_check(cut_spawn.size() == 2 and released == [ctick], "and places nobody twice, releasing once")
+	# A natural release announces itself too, with protection to re-arm.
+	_check(node_released_ok(rules), "players_released fires at LIVE after a full countdown")
+
+	# stop() in a countdown hands the number back and drops the queue.
+	var halt := _make_match(rules.duplicate())
+	var halt_spawn: Array = []
+	halt.respawn_due.connect(func(k: String, _s: DotSpawnPoint, _t: int) -> void: halt_spawn.append(k))
+	halt.start(0)
+	halt.add_player("a", "A", 0)
+	halt.add_player("b", "B", 0)
+	var htick := _advance(halt, 1, 62)
+	halt.report_kill("", "a", &"world", htick)
+	halt.stop(htick)
+	_check(halt.state == DotMatch.State.IDLE and halt.round_number == 0 and not halt.respawns.is_waiting("a"),
+		"stop in a countdown returns the round number and clears the queue")
+
+	# pause_when_empty off: a countdown runs to LIVE with nobody present.
+	var calm := _make_match(rules.duplicate())
+	calm.rules.pause_when_empty = false
+	calm.start(0)
+	calm.add_player("a", "A", 0)
+	calm.add_player("b", "B", 0)
+	var ktick := _advance(calm, 1, 62)
+	calm.remove_player("a")
+	calm.remove_player("b")
+	ktick = _advance(calm, ktick, 62)
+	_check(calm.state == DotMatch.State.LIVE and calm.round_number == 1, "pause_when_empty off: the countdown goes live regardless")
+
+	# The replicated freeze flag.
+	var wire := FakeBehaviour.new()
+	var net := _make_match(rules.duplicate())
+	net.rules.freeze_during_countdown = false
+	net.start(0)
+	net.add_player("a", "A", 0)
+	net.add_player("b", "B", 0)
+	_advance(net, 1, 62)
+	DotMatchNetSync.pull(net, wire, 62)
+	_check(wire.net_state == int(DotMatch.State.COUNTDOWN) and not DotMatchNetSync.is_frozen(wire),
+		"a client learns the countdown does not freeze, whatever its own rules say")
+	net.rules.freeze_during_countdown = true
+	DotMatchNetSync.pull(net, wire, 62)
+	_check(DotMatchNetSync.is_frozen(wire), "and that it does when it does")
+	wire.free()
+
 	# countdown_sec 0 keeps the old order: live first, then placed.
 	var zero := _make_match(rules.duplicate())
 	zero.rules.countdown_sec = 0.0
@@ -811,7 +889,7 @@ func _test_countdown_flow() -> void:
 		"a zero countdown skips the freeze and places players after round_started", str(order))
 
 	_free_spawns(points)
-	for each in [node, fin, empty, off, zero]:
+	for each in [node, fin, empty, off, zero, cut, halt, calm, net]:
 		each.queue_free()
 		remove_child(each)
 	_done()
@@ -1199,12 +1277,13 @@ class FakeBehaviour extends Object:
 	var net_round: int = 0
 	var net_ends_at: int = 0
 	var net_winner: int = 0
+	var net_frozen: int = 0
 
 
 func _test_net_sync() -> void:
 	_section("net sync")
 
-	_check(DotMatchNetSync.specs().size() == 4, "the bridge describes what replicates")
+	_check(DotMatchNetSync.specs().size() == 5, "the bridge describes what replicates")
 
 	var node := _make_match(_quick_rules(3))
 	node.start(0)
