@@ -1,0 +1,24 @@
+# comments
+# Baselines only shrink: scripts/<gate> --update lowers or drops entries and refuses to add.
+addons/dot_match/core/dot_kill_feed.gd::long_block	2
+addons/dot_match/core/dot_player_score.gd::long_block	2
+addons/dot_match/core/dot_respawn_queue.gd::long_block	2
+addons/dot_match/core/dot_scoreboard.gd::banner	3
+addons/dot_match/core/dot_scoreboard.gd::long_block	6
+addons/dot_match/core/dot_team.gd::long_block	2
+addons/dot_match/core/dot_team_manager.gd::banner	2
+addons/dot_match/core/dot_team_manager.gd::history	1
+addons/dot_match/core/dot_team_manager.gd::long_block	7
+addons/dot_match/dot_match.gd::banner	5
+addons/dot_match/dot_match.gd::history	2
+addons/dot_match/dot_match.gd::long_block	23
+addons/dot_match/dot_match_config.gd::long_block	3
+addons/dot_match/dot_match_plugin.gd::long_block	1
+addons/dot_match/net/dot_match_net_sync.gd::long_block	4
+addons/dot_match/rules/dot_match_rules.gd::banner	2
+addons/dot_match/rules/dot_match_rules.gd::long_block	6
+addons/dot_match/rules/dot_rules_elimination.gd::long_block	2
+addons/dot_match/spawn/dot_spawn_point.gd::long_block	3
+addons/dot_match/spawn/dot_spawn_selector.gd::long_block	5
+examples/match_selftest.gd::banner	10
+examples/match_selftest.gd::long_block	4

@@ -1,0 +1,7 @@
+# size
+# Baselines only shrink: scripts/<gate> --update lowers or drops entries and refuses to add.
+addons/dot_match/dot_match.gd	964
+addons/dot_match/dot_match.gd::setup	81
+examples/match_selftest.gd	1377
+examples/match_selftest.gd::_test_countdown_flow	213
+examples/match_selftest.gd::_test_spawn_selection	89
