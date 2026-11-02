@@ -21,7 +21,7 @@ extends Resource
 @export_group("Capacity")
 
 ## Most players allowed. Zero means unlimited, bounded only by the server.
-@export_range(0, 128, 1) var max_players: int = 0
+@export_range(0, 128, 1, "or_greater") var max_players: int = 0
 
 @export_group("Spawning")
 
