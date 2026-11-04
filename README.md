@@ -87,7 +87,7 @@ done
 godot --headless --path . res://examples/match_selftest.tscn
 ```
 
-114 checks, all offline. Exits non-zero on any failure.
+`match_selftest`, all offline. Exits non-zero on any failure.
 
 ## Licence
 
