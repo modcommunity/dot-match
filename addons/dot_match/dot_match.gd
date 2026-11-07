@@ -680,10 +680,10 @@ func add_player(key: String, display_name: String, tick: int, wanted_team: int =
 	# join handler puts them in the world before whatever the game does on join has
 	# run, and the respawn path already knows how to pick a safe point.
 	# During the countdown too, and at once: the player arrives frozen with everyone else.
-	if state == State.COUNTDOWN and not rules.respawn_disabled:
+	if state == State.COUNTDOWN and not DotMatchOverrides.respawn_off(config, rules):
 		respawns.enqueue_at(key, tick)
-	elif is_live() and not rules.respawn_disabled:
-		respawns.enqueue(key, tick, rules.respawn_delay_sec)
+	elif is_live() and not DotMatchOverrides.respawn_off(config, rules):
+		respawns.enqueue(key, tick, DotMatchOverrides.respawn_delay(config, rules, null))
 
 	return DotResult.success(record)
 
@@ -745,7 +745,7 @@ func report_kill(
 			tick,
 			points,
 			rules.suicide_points,
-			rules.friendly_points
+			DotMatchOverrides.friendly_points(config, rules)
 		)
 	else:
 		# Outside a live round the death is still real — the player is on the floor —
@@ -767,8 +767,8 @@ func report_kill(
 	})
 	kill_recorded.emit(entry)
 
-	if not rules.respawn_disabled:
-		respawns.enqueue(victim_key, tick, rules.respawn_delay(victim))
+	if not DotMatchOverrides.respawn_off(config, rules):
+		respawns.enqueue(victim_key, tick, DotMatchOverrides.respawn_delay(config, rules, victim))
 
 	if is_live():
 		_tick_live(tick)

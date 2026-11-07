@@ -38,6 +38,17 @@ extends DotConfig
 ## kick — is a server policy and belongs in dot-server.
 @export_range(0.0, 3600.0, 30.0) var idle_seconds: float = 180.0
 
+@export_group("Rule overrides")
+
+## Seconds before a dead player comes back, replacing the rules' own value. Negative keeps the rules'.
+@export_range(-1.0, 120.0, 0.5) var respawn_delay_sec: float = -1.0
+
+## Whether nobody respawns until the round ends: -1 keeps the rules', 0 respawns, 1 does not.
+@export_enum("Rules:-1", "Off:0", "On:1") var respawn_disabled: int = -1
+
+## Points for killing a team-mate, replacing the rules' own value. Below -100 keeps the rules'.
+@export_range(-101, 100, 1) var friendly_points: int = -101
+
 @export_group("Diagnostics")
 
 ## Log every state transition at info level. Cheap, and the first thing anyone wants
