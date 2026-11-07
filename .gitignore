@@ -14,3 +14,13 @@ export_presets.cfg
 # OS
 .DS_Store
 Thumbs.db
+/addons/dot_game
+/addons/dot_profile
+/addons/dot_server
+/addons/dot_net
+/addons/dot_combat
+/addons/dot_fx
+/addons/dot_map
+/addons/dot_player_class
+/addons/dot_team
+/addons/dot_user

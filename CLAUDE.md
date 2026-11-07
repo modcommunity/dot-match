@@ -18,12 +18,13 @@ Read the family [CLAUDE.md](../../CLAUDE.md) first; this file is only what is sp
 | Path | What |
 | --- | --- |
 | `dot_match.gd` | `DotMatch`: the state machine, `tick()`, `report_kill` / `report_assist` / `report_objective`, spawn points, `position_fn` |
-| `dot_match_config.gd` | `DotMatchConfig`: how the server runs it (`balance_between_rounds`) |
+| `dot_match_config.gd` | `DotMatchConfig`: how the server runs it (`balance_between_rounds`), and the rule overrides (`respawn_delay_sec`, `respawn_disabled`, `friendly_points`) that `DotGameConfigBinder` turns into `<prefix>_<field>` cvars; `dot_match_overrides.gd` applies them over the rules at use |
 | `rules/` | `DotMatchRules` (what the mode is: limits, `min_players`, `pause_when_empty`), `DotRulesElimination` (`alive_fn`) |
 | `core/` | `DotScoreboard`, `DotPlayerScore`, `DotTeam`, `DotTeamManager` (assignment, `rebalance`, `team_lookup()`), `DotRespawnQueue`, `DotKillFeed` |
 | `spawn/` | `DotSpawnPoint`, `DotSpawnSelector` (cooldowns, threats, `_fallback`) |
 | `net/dot_match_net_sync.gd` | `DotMatchNetSync`: state and `net_ends_at` as data specs |
 | `examples/match_selftest.tscn` | the suite, offline |
+| `examples/config_override_check.tscn` | the rule overrides; also the binder's cvars when dot-game, dot-profile and dot-server are linked into `addons/` |
 
 Paths except `examples/` are in `addons/dot_match/`.
 
