@@ -83,7 +83,7 @@ func _run() -> void:
 
 	node.config.respawn_delay_sec = 1.0
 	node.config.friendly_points = -7
-	var before := node.scoreboard.find("a").score
+	var before: Variant = node.scoreboard.find("a").score
 	node.report_kill("a", "b", &"rifle", tick)
 	_check(node.scoreboard.find("a").score == before - 7, "friendly_points override sets the team-kill penalty")
 	_check(absf(node.respawns.seconds_remaining("b", tick) - 1.0) < 0.05, "respawn_delay_sec override sets the wait")
@@ -126,7 +126,7 @@ func _binder(script: Script) -> void:
 	_check(delay.get("name") == "mp_respawn_delay_sec" and friendly.get("name") == "mp_friendly_points", "named mp_<field>")
 	_check(delay.call("set_value", "2.0").ok and is_equal_approx(node.config.respawn_delay_sec, 2.0), "setting the delay cvar writes the config")
 	_check(friendly.call("set_value", "-4").ok and node.config.friendly_points == -4, "setting the friendly cvar writes the config")
-	var before := node.scoreboard.find("a").score
+	var before: Variant = node.scoreboard.find("a").score
 	node.report_kill("a", "b", &"rifle", tick)
 	_check(node.scoreboard.find("a").score == before - 4, "the next team kill uses the cvar")
 	_check(absf(node.respawns.seconds_remaining("b", tick) - 2.0) < 0.05, "the next respawn uses the cvar")
