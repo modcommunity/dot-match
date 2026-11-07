@@ -29,7 +29,7 @@ Paths except `examples/` are in `addons/dot_match/`.
 
 ## Running and testing
 
-The family's two steps ([game-dev/CLAUDE.md](../../CLAUDE.md#validating-anything)), then `godot --headless --path . res://examples/match_selftest.tscn` (exits non-zero on any failure). Run it after any change to the state machine: its bugs parse cleanly.
+The family's two steps ([family CLAUDE.md](../../CLAUDE.md#validating-anything)), then `godot --headless --path . res://examples/match_selftest.tscn` (exits non-zero on any failure). Run it after any change to the state machine: its bugs parse cleanly.
 
 ## Rules that bite
 
