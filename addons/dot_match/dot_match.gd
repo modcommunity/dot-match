@@ -250,7 +250,7 @@ func setup() -> DotResult:
 ## [param announce_empty] is the difference between "I was asked to re-collect and found
 ## nothing", which is worth a warning, and "I have just been built and the host has not
 ## put its points in yet", which is not. [method setup] passes false for the second
-## reason: game-arena, game-g2gfast and every other code-built map in this family add
+## reason: game-fatal-contact, game-airdrift and every other code-built map in this family add
 ## their points with [method add_spawn_point] immediately after setup returns, and a red
 ## line on every boot about a condition that is fixed on the next line is the shape this
 ## family calls "a warning that reads like a setting nobody has filled in" — which is how
@@ -295,7 +295,7 @@ func _collect_spawns(node: Node) -> void:
 ## [b]Do not mutate it; use the three methods below.[/b] A caller that clears the array
 ## this returns does clear the match's spawns today, but it does so behind the one class
 ## that logs and counts them, and any day this returns a copy that caller silently stops
-## working. game-g2gfast did exactly that on every map load until 2026-09-25.
+## working. game-airdrift did exactly that on every map load until 2026-09-25.
 func spawn_points() -> Array[DotSpawnPoint]:
 	_forget_freed_spawns()
 	return _spawn_points

@@ -79,7 +79,7 @@ dot-match names no class outside dot-core: not dot-combat, dot-net, dot-server o
 - `DotTeamManager.team_lookup()` returns exactly the `Callable` that dot-combat's `DotDamageResolver.team_of` wants, without either project naming the other.
 - Nothing here spawns anything. `respawn_due` carries a `DotSpawnPoint`; the game spawns, because what a player *is* is not dot-match's business.
 
-The `DotModule` that binds a match to a dot-server belongs in the game (game-arena's `arena_module.gd` is one): dot-server is not a dependency, and the bridge that forwards joins, leaves and deaths is about forty lines.
+The `DotModule` that binds a match to a dot-server belongs in the game (game-fatal-contact's `arena_module.gd` is one): dot-server is not a dependency, and the bridge that forwards joins, leaves and deaths is about forty lines.
 
 ## Deliberately not here
 
