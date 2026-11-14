@@ -35,13 +35,13 @@ enum Outcome {
 @export_group("Winning")
 
 ## Points to win. Zero means the score does not end a match.
-@export_range(0, 10000, 1) var score_limit: int = 30
+@export_range(0, 10000, 1, "or_greater") var score_limit: int = 30
 
 ## Seconds a round lasts. Zero means no clock.
 @export_range(0.0, 7200.0, 10.0) var time_limit_sec: float = 600.0
 
 ## Rounds to win a match. One means the match is one round.
-@export_range(1, 15, 1) var rounds_to_win: int = 1
+@export_range(1, 15, 1, "or_greater") var rounds_to_win: int = 1
 
 @export_group("Scoring")
 
@@ -82,7 +82,7 @@ enum Outcome {
 @export_range(0.0, 600.0, 5.0) var warmup_sec: float = 30.0
 
 ## Players needed before warmup can end. One lets a solo player start.
-@export_range(1, 64, 1) var min_players: int = 2
+@export_range(1, 64, 1, "or_greater") var min_players: int = 2
 
 ## Seconds everyone stands at their spawn before the round goes live. Entered straight
 ## from warmup, from a round's intermission and from the match end (when enough players
